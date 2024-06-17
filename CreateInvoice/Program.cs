@@ -1,8 +1,11 @@
 using CreateInvoice.Components;
+using CreateInvoice.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddSingleton<PdfService>();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
