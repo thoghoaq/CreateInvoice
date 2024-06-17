@@ -1,24 +1,169 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @using System.IO
+@using CreateInvoice.Enums
+@using CreateInvoice.Extensions
 @using CreateInvoice.Features
+@using CreateInvoice.Helpers
 @using QuestPDF.Helpers
+@using CreateInvoice.Models
+@using System.Collections.Generic
+@using System.Linq
+@using System.Text.Json
 @inject PdfService PdfService
 @inject IJSRuntime JSRuntime
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Xuất hóa đơn</PageTitle>
 
-<h3>Export PDF Example</h3>
-<button @onclick="GeneratePdf">
-    Export PDF
-</button>
+<h3>Xuất hóa đơn</h3>
+@if (saving)
+{
+    <p>Đang lưu...</p>
+}
+else
+{
+    <EditForm Model="@invoice" OnValidSubmit="@HandleValidSubmit" class="invoice-form">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group my-3">
+            <label>SỐ HÓA ĐƠN:</label>
+            <InputText @bind-Value="invoice.InvoiceNumber" class="form-control" />
+            <ValidationMessage For="@(() => invoice.InvoiceNumber)" class="text-danger" />
+        </div>
+
+        <div class="form-group my-3">
+            <label>NGÀY:</label>
+            <InputDate @bind-Value="invoice.InvoiceDate" class="form-control" />
+            <ValidationMessage For="@(() => invoice.InvoiceDate)" class="text-danger" />
+        </div>
+
+        <div class="form-group my-3">
+            <label>KHÁCH HÀNG:</label>
+            <InputText @bind-Value="invoice.CustomerName" class="form-control" />
+            <ValidationMessage For="@(() => invoice.CustomerName)" class="text-danger" />
+        </div>
+
+        <div class="form-group my-3">
+            <label>ĐỊA CHỈ:</label>
+            <InputText @bind-Value="invoice.CustomerAddress" class="form-control" />
+            <ValidationMessage For="@(() => invoice.CustomerAddress)" class="text-danger" />
+        </div>
+
+        <div class="form-group my-3">
+            <label>SĐT:</label>
+            <InputText @bind-Value="invoice.CustomerPhoneNumber" class="form-control" />
+            <ValidationMessage For="@(() => invoice.CustomerPhoneNumber)" class="text-danger" />
+        </div>
+
+        <div class="form-group my-3">
+            <label>GHI CHÚ:</label>
+            <InputTextArea @bind-Value="invoice.Note" class="form-control" />
+            <ValidationMessage For="@(() => invoice.Note)" class="text-danger" />
+        </div>
+
+        <h4>Danh sách hàng hóa</h4>
+        @foreach (var item in invoice.Items)
+        {
+            <div class="item-container">
+                <div class="form-row">
+                    <div class="form-group col-md-6 my-3">
+                        <label>TÊN HÀNG HÓA:</label>
+                        <InputText @bind-Value="item.Name" class="form-control" />
+                        <ValidationMessage For="@(() => item.Name)" class="text-danger" />
+                    </div>
+                    <div class="form-group col-md-6 my-3">
+                        <label>DVT:</label>
+                        <InputSelect @bind-Value="item.Dvt" class="form-control">
+                            <option value="">Chọn đơn vị tính</option>
+                            @foreach (var unit in Enum.GetValues(typeof(Unit)).Cast<Unit>())
+                            {
+                                <option value="@unit">@unit.GetDisplayName()</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => item.Dvt)" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-3 my-3">
+                        <label>RỘNG (CM):</label>
+                        <InputNumber @bind-Value="item.Width" class="form-control" />
+                        <ValidationMessage For="@(() => item.Width)" class="text-danger" />
+                    </div>
+                    <div class="form-group col-md-3 my-3">
+                        <label>CAO (CM):</label>
+                        <InputNumber @bind-Value="item.Height" class="form-control" />
+                        <ValidationMessage For="@(() => item.Height)" class="text-danger" />
+                    </div>
+                    <div class="form-group col-md-3 my-3">
+                        <label>SỐ BỘ:</label>
+                        <InputNumber @bind-Value="item.Quantity" class="form-control" />
+                        <ValidationMessage For="@(() => item.Quantity)" class="text-danger" />
+                    </div>
+                    <div class="form-group col-md-3 my-3">
+                        <label>ĐƠN GIÁ:</label>
+                        <InputNumber @bind-Value="item.Price" class="form-control" />
+                        <ValidationMessage For="@(() => item.Price)" class="text-danger" />
+                    </div>
+                </div>
+
+                <p>TỔNG M2: @item.TotalM2</p>
+                <p>THÀNH TIỀN: @item.Total.ToCurrency()</p>
+
+                <button type="button" class="btn btn-sm btn-danger mb-3" @onclick="() => RemoveItem(item)">Xóa</button>
+            </div>
+        }
+
+        <button type="button" class="btn btn-primary" @onclick="AddNewItem">Thêm hàng hóa</button>
+
+        <div class="form-group my-3">
+            <label>PHÍ SHIP:</label>
+            <InputNumber @bind-Value="invoice.ShippingFee" class="form-control" />
+            <ValidationMessage For="@(() => invoice.ShippingFee)" class="text-danger" />
+        </div>
+
+        <p>CỘNG TIỀN HÀNG: @invoice.Total.ToCurrency()</p>
+
+        <button type="submit" class="btn btn-success mb-3 w-100">Xuất hóa đơn</button>
+    </EditForm>
+}
 
 @code {
-    private async Task GeneratePdf()
+    Invoice invoice = new Invoice
+        {
+            InvoiceDate = DateTime.UtcNow.AddHours(7)
+        };
+    bool saving = false;
+
+    async Task HandleValidSubmit()
     {
-        var pdfBytes = PdfService.GeneratePdf();
+        // Handle saving logic here
+        saving = true;
+        // Example: Save to database or perform other actions
+        // For demo purposes, just print the invoice JSON
+        Console.WriteLine(JsonSerializer.Serialize(invoice));
+        await GeneratePdf(invoice);
+        saving = false;
+    }
+
+    void AddNewItem()
+    {
+        invoice.Items.Add(new InvoiceItem
+        {
+            Dvt = Unit.M2.GetDisplayName()
+        });
+    }
+
+    void RemoveItem(InvoiceItem item)
+    {
+        invoice.Items.Remove(item);
+    }
+    private async Task GeneratePdf(Invoice invoice)
+    {
+        var pdfBytes = PdfService.GeneratePdf(invoice);
         var base64 = Convert.ToBase64String(pdfBytes);
         // Use JavaScript interop to initiate the file download
-        await JSRuntime.InvokeVoidAsync("downloadFile", "sample.pdf", base64);
+        await JSRuntime.InvokeVoidAsync("downloadFile", $"HD{invoice.InvoiceNumber}.pdf", base64);
     }
 }

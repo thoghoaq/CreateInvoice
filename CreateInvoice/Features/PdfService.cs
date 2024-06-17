@@ -1,15 +1,25 @@
-﻿using QuestPDF.Fluent;
+﻿using CreateInvoice.Extensions;
+using CreateInvoice.Helpers;
+using CreateInvoice.Models;
+using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
 namespace CreateInvoice.Features
 {
-    public class PdfService
+    public class PdfService(IConfiguration configuration)
     {
-        public byte[] GeneratePdf()
+        public byte[] GeneratePdf(Invoice invoice)
         {
             QuestPDF.Settings.License = LicenseType.Community;
             using var stream = new MemoryStream();
+            var storeName = configuration.GetSection("BaseInfo:StoreName").Value;
+            var storePhone = configuration.GetSection("BaseInfo:Phone").Value;
+            var storeAddress = configuration.GetSection("BaseInfo:Address").Value;
+            var bankName = configuration.GetSection("BaseInfo:PaymentInfo:BankName").Value;
+            var bankAccount = configuration.GetSection("BaseInfo:PaymentInfo:BankAccount").Value;
+            var bankAccountName = configuration.GetSection("BaseInfo:PaymentInfo:BankAccountName").Value;
+            var hotline = configuration.GetSection("BaseInfo:Hotline").Value;
 
             Document.Create(container =>
             {
@@ -30,17 +40,17 @@ namespace CreateInvoice.Features
                             row.ConstantItem(50).Height(50).Placeholder(); // Logo or Placeholder
                             row.RelativeItem().Column(col =>
                             {
-                                col.Item().Text("RÈM QUANG HUY").FontSize(14).Bold();
-                                col.Item().Text("SDT: 0334191022");
-                                col.Item().Text("số 8 Nghi Tàm, Hà Nội, 14 Hùng Vương, P1, Q10");
+                                col.Item().Text(storeName).FontSize(14).Bold();
+                                col.Item().Text($"SĐT: {storePhone}");
+                                col.Item().Text(storeAddress);
                             });
 
                             row.RelativeItem().Column(col =>
                             {
                                 col.Spacing(5);
                                 col.Item().Text("ĐƠN ĐẶT HÀNG").FontSize(20).AlignRight().Bold();
-                                col.Item().Text("Ngày 12 tháng 06 năm 2024").AlignRight();
-                                col.Item().Text("SỐ HÓA ĐƠN: 000776").AlignRight().FontSize(14).Bold();
+                                col.Item().Text(invoice.InvoiceDate.ToVietnameseDate()).AlignRight();
+                                col.Item().Text($"SỐ HÓA ĐƠN: {invoice.InvoiceNumber}").AlignRight().FontSize(14).Bold();
                             });
                         });
 
@@ -59,16 +69,16 @@ namespace CreateInvoice.Features
                             });
 
                             table.Cell().Element(CellStyle).Text("KHÁCH HÀNG").Bold();
-                            table.Cell().Element(CellStyle).Text("chị Nguyễn Hòa");
+                            table.Cell().Element(CellStyle).Text(invoice.CustomerName);
 
                             table.Cell().Element(CellStyle).Text("ĐỊA CHỈ").Bold();
-                            table.Cell().Element(CellStyle).Text("106/35 ĐƯỜNG 109 PHƯỚC LONG B, THỦ ĐỨC, TPHCM");
+                            table.Cell().Element(CellStyle).Text(invoice.CustomerAddress);
 
                             table.Cell().Element(CellStyle).Text("SDT").Bold();
-                            table.Cell().Element(CellStyle).Text("0372 015192");
+                            table.Cell().Element(CellStyle).Text(invoice.CustomerPhoneNumber);
 
                             table.Cell().Element(CellStyle).Text("GHI CHÚ").Bold();
-                            table.Cell().Element(CellStyle).Text("2 BỘ RÈM CUỐN MÀU NÂU");
+                            table.Cell().Element(CellStyle).Text(invoice.Note);
 
                             static IContainer CellStyle(IContainer container) => container.Border(1).Padding(5).AlignLeft();
                         });
@@ -105,25 +115,28 @@ namespace CreateInvoice.Features
                             });
 
                             // Item Rows
-                            table.Cell().Element(CellStyle).Text("1");
-                            table.Cell().Element(CellStyle).Text("TX05 asjdhkajfdhkafksdfads");
-                            table.Cell().Element(CellStyle).Text("M2");
-                            table.Cell().Element(CellStyle).Text("105");
-                            table.Cell().Element(CellStyle).Text("180");
-                            table.Cell().Element(CellStyle).Text("2");
-                            table.Cell().Element(CellStyle).Text("3.78M2");
-                            table.Cell().Element(CellStyle).Text("195.000");
-                            table.Cell().Element(CellStyle).Text("737.000");
+                            foreach (var item in invoice.Items)
+                            {
+                                table.Cell().Element(CellStyle).Text((invoice.Items.IndexOf(item) + 1).ToString()).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.Name).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.Dvt).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.Width.ToString()).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.Height.ToString()).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.Quantity.ToString()).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.TotalM2).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.Price.ToCurrency()).FontSize(10);
+                                table.Cell().Element(CellStyle).Text(item.Total.ToCurrency()).FontSize(10);
+                            }
 
-                            table.Cell().Element(CellStyle).Text("2");
-                            table.Cell().Element(CellStyle).Text("PHÍ SHIP");
+                            table.Cell().Element(CellStyle).Text((invoice.Items.Count + 1).ToString()).FontSize(10);
+                            table.Cell().Element(CellStyle).Text("PHÍ SHIP").FontSize(10);
                             table.Cell().Element(CellStyle).Text("");
                             table.Cell().Element(CellStyle).Text("");
                             table.Cell().Element(CellStyle).Text("");
                             table.Cell().Element(CellStyle).Text("");
                             table.Cell().Element(CellStyle).Text("");
-                            table.Cell().Element(CellStyle).Text("30.000");
-                            table.Cell().Element(CellStyle).Text("30.000");
+                            table.Cell().Element(CellStyle).Text(invoice.ShippingFee.ToCurrency()).FontSize(10);
+                            table.Cell().Element(CellStyle).Text(invoice.ShippingFee.ToCurrency()).FontSize(10);
 
                             static IContainer CellStyle(IContainer container) => container.Border(1).PaddingHorizontal(1).PaddingVertical(5).AlignCenter();
                         });
@@ -136,19 +149,19 @@ namespace CreateInvoice.Features
                             });
 
                             table.Cell().Element(CellStyle).Text("CỘNG TIỀN HÀNG:").Bold();
-                            table.Cell().Element(CellStyle).Text("767.000");
+                            table.Cell().Element(CellStyle).Text(invoice.Total.ToCurrency());
 
                             static IContainer CellStyle(IContainer container) => container.Border(1).Padding(5).AlignCenter();
                         });
 
-                        column.Item().Text("(Số tiền viết bằng chữ: BẢY TRĂM SÁU MƯƠI BẢY NGHÌN ĐỒNG)").Bold().Italic().AlignRight();
+                        column.Item().Text($"(Số tiền viết bằng chữ: {invoice.Total.ToVietnameseCurrency()})").Bold().Italic().AlignRight();
 
                         // Payment Info
                         column.Item().PaddingVertical(15).Column(innerColumn =>
                         {
                             innerColumn.Spacing(2);
                             innerColumn.Item().Text("HÌNH THỨC THANH TOÁN:").Bold().FontColor(Color.FromHex("#FF0000"));
-                            innerColumn.Item().Element(container => container.PaddingVertical(5)).Text("Quý khách vui lòng chuyển khoản số tiền là: 767.000đ").Bold().Italic();
+                            innerColumn.Item().Element(container => container.PaddingVertical(5)).Text($"Quý khách vui lòng chuyển khoản số tiền là: {invoice.Total.ToCurrency()}đ").Bold().Italic();
                             innerColumn.Item().Row(row =>
                             {
                                 row.Spacing(2);
@@ -168,9 +181,9 @@ namespace CreateInvoice.Features
                                 row.AutoItem().Text("Thông tin chuyển khoản:");
                                 row.AutoItem().Column(col =>
                                 {
-                                    col.Item().Text("NH TECHCOMBANK").Bold();
-                                    col.Item().Text("STK: 9145 686868").Bold();
-                                    col.Item().Text("CTK: NGUYEN THI NGOC ANH").Bold();
+                                    col.Item().Text(bankName).Bold();
+                                    col.Item().Text($"STK: {bankAccount}").Bold();
+                                    col.Item().Text($"CTK: {bankAccountName}").Bold();
                                 });
                             });
                         });
@@ -199,7 +212,7 @@ namespace CreateInvoice.Features
                         row.ConstantItem(180).AlignMiddle().Text("Sản phẩm được bảo hành 12 tháng nếu lỗi từ nhà sản xuất.").Bold().Italic().FontSize(14);
                         row.RelativeItem().Border(1).Padding(5).AlignMiddle().Column(col =>
                         {
-                            col.Item().AlignCenter().Text("HOTLINE/ZALO: 0101010101").Bold();
+                            col.Item().AlignCenter().Text($"HOTLINE/ZALO: {hotline}").Bold();
                             col.Item().AlignMiddle().PaddingVertical(5).Row(innerRow =>
                             {
                                 innerRow.Spacing(5);
