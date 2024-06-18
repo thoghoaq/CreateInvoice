@@ -26,6 +26,6 @@ namespace CreateInvoice.Models
         public int Quantity { get; set; }
         public string TotalM2 => $"{Math.Round(UnitConverter.Convert(Width * Height, Unit.CM2, Dvt.GetUnitEnum()) * Quantity, 2)}{Dvt}";
         public decimal Price { get; set; }
-        public decimal Total => Math.Round((decimal)(UnitConverter.Convert(Width * Height, Unit.CM2, Dvt.GetUnitEnum())) * Quantity * Price) * 1000;
+        public decimal Total => Math.Round((decimal)(UnitConverter.Convert(Width * Height, Unit.CM2, Dvt.GetUnitEnum())) * Quantity * Price);
     }
 }
